@@ -1,0 +1,69 @@
+version: 2
+
+sources:
+  - name: raw
+    description: >
+      Datos crudos cargados por la ingesta (carpeta ingest/).
+      Full refresh desde archivos planos; todas las columnas de los CSV
+      llegan como VARCHAR y se castean en staging.
+    schema: raw
+    tables:
+      - name: customers
+        description: Clientes del Sales DB (customers.csv).
+        columns:
+          - name: id
+            description: Clave surrogada asignada en la exportación.
+            data_tests:
+              - unique
+              - not_null
+
+      - name: orders
+        description: Cabecera de órdenes del Sales DB (orders.csv).
+        columns:
+          - name: id
+            data_tests:
+              - unique
+              - not_null
+          - name: customer_id
+            data_tests:
+              - not_null
+          - name: order_date
+            data_tests:
+              - not_null
+
+      - name: order_items
+        description: >
+          Líneas de orden del Sales DB (order_items.csv). product_id NO es una
+          FK garantizada: el sistema de origen no la valida.
+        columns:
+          - name: id
+            data_tests:
+              - unique
+              - not_null
+          - name: order_id
+            data_tests:
+              - not_null
+          - name: product_id
+            data_tests:
+              - not_null
+
+      - name: products
+        description: Catálogo de productos del Product DB (products.json).
+        columns:
+          - name: id
+            data_tests:
+              - unique
+              - not_null
+
+      - name: fx_rates
+        description: >
+          Respuestas de ejemplo de la API de tipo de cambio (fx_rates.json).
+          Una fila por respuesta; rates es un JSON {moneda_destino: tasa}
+          que convierte 1 unidad de base_currency.
+        columns:
+          - name: base_currency
+            data_tests:
+              - not_null
+          - name: rate_date
+            data_tests:
+              - not_null

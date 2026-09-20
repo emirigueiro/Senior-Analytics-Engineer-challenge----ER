@@ -1,0 +1,190 @@
+version: 2
+
+# Severidad: se configura en cada TEST (dentro de su bloque config),
+# no a nivel de columna. Sin config, el test es severity: error.
+
+models:
+  - name: stg_customers
+    description: CUSTOMERS. 1 record per customer.
+    columns:
+      - name: customer_id
+        description: Clave del cliente.
+        data_tests:
+          - unique
+          - not_null
+      - name: email
+      - name: registered_at
+      - name: country
+    
+
+  - name: stg_orders
+    description: >
+      Orders. 1 record per order. The total between the order header and the sum of its lines is not guaranteed to match.
+    columns:
+      - name: order_id
+        description: >
+          Order key. The relationships test towards stg_order_items
+          detects orders without line items (warning: known issue).
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_order_items')
+                field: order_id
+                severity: warn
+      - name: customer_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
+      - name: ordered_at
+        data_tests:
+          - not_null:
+              config:
+                severity: warn
+      - name: order_date
+        description: Order date (with out time).
+      - name: order_total_amount
+        description: Total amount of the order.
+        data_tests:
+          - not_null:
+              config:
+                severity: warn
+          - positive_value:
+              config:
+                severity: warn
+      - name: currency_code
+        description: >
+          Currency of the order. It is expected to exist in the exchange rate API;
+          invalid codes (XYZ, ABC, QWE) are reported as warnings.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_fx_rates')
+                field: currency_from
+              config:
+                severity: warn
+      - name: order_status
+        description: >
+          Order status. Today all are 'completed'. A new value is
+          reported as a warning; the eligible revenue is filtered in the model.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['completed']
+              config:
+                severity: warn
+
+  - name: stg_order_items
+    description: Order lines. One record per line.
+    columns:
+      - name: order_item_id
+        description: Line KEY.
+        data_tests:
+          - unique
+          - not_null
+      - name: order_id
+        description: Order to which the line belongs.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
+      - name: product_id
+        description: >
+          Product sold. It is not a guaranteed FK in the source: some lines
+          reference products that are not in the catalog (warning).
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_products')
+                field: product_id
+              config:
+                severity: warn
+      - name: quantity
+        data_tests:
+          - not_null
+          - positive_value
+      - name: unit_price
+        data_tests:
+          - not_null
+          - positive_value
+      - name: currency_code
+        description: >
+          Currency of the line. It may differ from the currency of its order; invalid
+          codes are reported as warnings.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_fx_rates')
+                field: currency_from
+              config:
+                severity: warn
+
+  - name: stg_products
+    description: Product catalog. One record per product.
+    columns:
+      - name: product_id
+        description: Product KEY.
+        data_tests:
+          - unique
+          - not_null
+      - name: product_name
+        data_tests:
+          - not_null
+      - name: category
+        data_tests:
+          - not_null:
+              config:
+                severity: warn
+      - name: base_price
+        data_tests:
+          - positive_value:
+              config:
+                severity: warn
+      - name: base_price_currency_code
+        data_tests:
+          - not_null:
+              config:
+                severity: warn
+
+  - name: stg_fx_rates
+    description: >
+      Exchange rates flattened from the API responses. One record
+      per date + source currency + target currency.
+    columns:
+      - name: fx_rate_id
+        description: Composite key currency_from_currency_to_fecha.
+        data_tests:
+          - unique
+          - not_null
+      - name: currency_from
+        data_tests:
+          - not_null:
+              config:
+                severity: warn
+      - name: currency_to
+        data_tests:
+          - not_null:
+              config:
+                severity: warn
+      - name: rate_date
+        data_tests:
+          - not_null:
+              config:
+                severity: warn
+      - name: rate
+        data_tests:
+          - not_null:
+              config:
+                severity: warn
+          - positive_value:
+              config:
+                severity: warn
